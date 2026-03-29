@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Control Radio - La Voz de Manaure</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#d32f2f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2301/2301145.png">
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; padding: 15px; font-size: 14px; margin: 0; }
+        .card { background: white; padding: 18px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 15px; }
+        h2 { color: #d32f2f; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 8px; font-size: 1.1em; }
+        input, select, textarea { padding: 12px; margin: 5px 0; border: 1px solid #ccc; border-radius: 8px; width: 100%; box-sizing: border-box; font-size: 16px; }
+        button { padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; color: white; transition: 0.3s; }
+        
+        .btn-pay { background: #27ae60; font-size: 1.1em; width: 100%; }
+        .btn-edit { background: #f39c12; padding: 5px 8px; font-size: 11px; }
+        .btn-del { background: #ff5252; padding: 5px 8px; font-size: 11px; }
+        .btn-ws { background: #25d366; padding: 5px 8px; font-size: 11px; }
+        .btn-admin { background: #8e44ad; width: 100%; margin-top: 5px; font-size: 10px; }
+        
+        .table-container { max-height: 300px; overflow-x: auto; border: 1px solid #ddd; border-radius: 8px; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 9px; min-width: 450px; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
+        th { background-color: #2c3e50; color: white; position: sticky; top: 0; }
+        
+        .resumen-box { background: #f8f9fa; padding: 10px; border-radius: 8px; text-align: center; margin-bottom: 10px; border-top: 4px solid #ccc; }
+        .resumen-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 10px; }
+        .badge { padding: 2px 4px; border-radius: 4px; font-size: 8px; color: white; font-weight: bold; }
+        
+        .hidden { display: none; }
+        .field-label { font-size: 11px; font-weight: bold; color: #555; margin-top: 5px; display: block; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>1. Directorio (Personal / Locutores)</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <input type="text" id="new_prog" placeholder="Nombre completo">
+            <input type="text" id="new_phone" placeholder="WhatsApp +58...">
+        </div>
+        <button style="background:#d32f2f; margin-top:10px; width: 100%;" onclick="agregarPrograma()">+ AGREGAR AL DIRECTORIO</button>
+        <div class="table-container" style="max-height: 120px; margin-top: 10px;">
+            <table style="min-width: 100%;">
+                <thead><tr><th>Nombre</th><th>Eliminar</th></tr></thead>
+                <tbody id="lista_directorio"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 id="titulo_form">2. Registrar Cobro</h2>
+        <input type="hidden" id="edit_id">
+        <select id="tipo_pago" onchange="togglePublicidadFields()" style="border: 2px solid #d32f2f;">
+            <option value="programa">📻 Pago de Programa</option>
+            <option value="publicidad">📢 Pago de Publicidad</option>
+        </select>
+        <select id="select_prog"><option value="">Cargando lista...</option></select>
+        <div id="campos_publicidad" class="hidden"><input type="text" id="nombre_empresa" placeholder="Nombre del comercio"></div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div><label class="field-label">Bruto ($):</label><input type="number" id="monto_recibido" placeholder="0.00"></div>
+            <div id="container_internet"><label class="field-label">Internet ($):</label><input type="number" id="monto_internet" placeholder="0.00" value="0"></div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <select id="periodo_pago">
+                <option value="Semana 1">Semana 1</option><option value="Semana 2">Semana 2</option>
+                <option value="Semana 3">Semana 3</option><option value="Semana 4">Semana 4</option>
+                <option value="Mes Completo">Mes Completo</option>
+            </select>
+            <input type="date" id="fecha_pago">
+        </div>
+        <textarea id="notas_pago" rows="2" style="margin-top:10px;" placeholder="Observaciones..."></textarea>
+        <button id="btn_guardar" class="btn-pay" style="margin-top:10px;" onclick="registrarPago()">EFECTUAR REGISTRO</button>
+        <button id="btn_cancelar" class="btn-del hidden" style="margin-top:5px; width: 100%;" onclick="cancelarEdicion()">CANCELAR EDICIÓN</button>
+    </div>
+
+    <div class="card">
+        <div class="resumen-grid">
+            <div class="resumen-box" style="border-color: #27ae60;"><small>Internet</small><br><b id="tot_internet">$0.00</b></div>
+            <div class="resumen-box" style="border-color: #e67e22;"><small>Radio</small><br><b id="tot_radio">$0.00</b></div>
+            <div class="resumen-box" style="border-color: #007bff;"><small>Dirección</small><br><b id="tot_direccion">$0.00</b></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>3. Historial</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr><th>Tipo</th><th>Concepto</th><th>Bruto</th><th>Neto</th><th>Int.</th><th>Rad.</th><th>Dir.</th><th>Acciones</th></tr>
+                </thead>
+                <tbody id="cuerpo_tabla"></tbody>
+            </table>
+        </div>
+        <button style="background:#2c3e50; margin-top:15px; font-size:11px; width: 100%;" onclick="borrarTodoElHistorial()">⚠️ CERRAR CAJA (BORRAR TODO)</button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+        <div class="card" style="border: 1px solid #007bff;">
+            <h2>Dirección</h2>
+            <button style="background:#007bff; font-size:10px; width: 100%;" onclick="enviarReporte('direccion', 'final')">ENVIAR LEO</button>
+            <button class="btn-admin" onclick="enviarReporte('direccion', 'admin')">👁️ REVISIÓN ADMIN</button>
+        </div>
+        <div class="card" style="border: 1px solid #e67e22;">
+            <h2>Radio</h2>
+            <button style="background:#e67e22; font-size:10px; width: 100%;" onclick="enviarReporte('radio', 'final')">ENVIAR RADIO</button>
+            <button class="btn-admin" onclick="enviarReporte('radio', 'admin')">👁️ REVISIÓN ADMIN</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>4. Números de Envío</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px;">
+            <input type="text" id="cfg_tel_admin" placeholder="Admin">
+            <input type="text" id="cfg_tel_leo" placeholder="Leo">
+            <input type="text" id="cfg_tel_rad" placeholder="Radio">
+        </div>
+        <button style="background:#2c3e50; width:100%; margin-top:10px;" onclick="guardarConfig()">💾 GUARDAR NÚMEROS</button>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCZIJ0ZZFvkih8SgRCp7hXrELIGA_UzgI4",
+            authDomain: "admin-radio-app.firebaseapp.com",
+            projectId: "admin-radio-app",
+            storageBucket: "admin-radio-app.firebasestorage.app",
+            messagingSenderId: "233609385279",
+            appId: "1:233609385279:web:cf1167a571e9930c686f8a"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let tAdmin = "", tLeo = "", tRad = "";
+        let logsDir = [], logsRad = [];
+        let gtDir=0, gtRad=0, gtInt=0;
+
+        // Cargar Configuración de Teléfonos
+        db.collection("config").doc("contactos").onSnapshot(doc => { 
+            if(doc.exists){ 
+                const d = doc.data(); tAdmin = d.admin; tLeo = d.leo; tRad = d.radio;
+                document.getElementById("cfg_tel_admin").value = tAdmin || "";
+                document.getElementById("cfg_tel_leo").value = tLeo || "";
+                document.getElementById("cfg_tel_rad").value = tRad || "";
+            } 
+        });
+
+        async function guardarConfig() {
+            await db.collection("config").doc("contactos").set({
+                leo: document.getElementById("cfg_tel_leo").value,
+                radio: document.getElementById("cfg_tel_rad").value,
+                admin: document.getElementById("cfg_tel_admin").value
+            });
+            alert("Números guardados.");
+        }
+
+        // Directorio
+        db.collection("programas").orderBy("nombre").onSnapshot(snap => {
+            const select = document.getElementById("select_prog");
+            const lista = document.getElementById("lista_directorio");
+            select.innerHTML = '<option value="">Seleccione Persona...</option>';
+            lista.innerHTML = "";
+            snap.forEach(doc => {
+                const p = doc.data();
+                select.innerHTML += `<option value="${p.nombre}">${p.nombre}</option>`;
+                lista.innerHTML += `<tr><td style="text-align:left">${p.nombre}</td><td><button class="btn-del" onclick="borrarPersona('${doc.id}')">🗑️</button></td></tr>`;
+            });
+        });
+
+        async function agregarPrograma() { 
+            const n = document.getElementById("new_prog").value, t = document.getElementById("new_phone").value; 
+            if(n && t) await db.collection("programas").add({nombre: n, telf: t}); 
+            document.getElementById("new_prog").value = ""; document.getElementById("new_phone").value = ""; 
+        }
+
+        async function borrarPersona(id) { if(confirm("¿Eliminar del directorio?")) await db.collection("programas").doc(id).delete(); }
+
+        // Pagos
+        function togglePublicidadFields() {
+            const tipo = document.getElementById("tipo_pago").value;
+            document.getElementById("campos_publicidad").classList.toggle("hidden", tipo !== "publicidad");
+            document.getElementById("container_internet").classList.toggle("hidden", tipo === "publicidad");
+            if(tipo === "publicidad") document.getElementById("monto_internet").value = "0";
+        }
+
+        async function registrarPago() {
+            const id = document.getElementById("edit_id").value;
+            const p = {
+                tipo: document.getElementById("tipo_pago").value, locutor: document.getElementById("select_prog").value,
+                empresa: document.getElementById("nombre_empresa").value, montoTotal: parseFloat(document.getElementById("monto_recibido").value),
+                montoInternet: parseFloat(document.getElementById("monto_internet").value) || 0, fecha: document.getElementById("fecha_pago").value,
+                periodo: document.getElementById("periodo_pago").value, notas: document.getElementById("notas_pago").value
+            };
+            if(!p.locutor || isNaN(p.montoTotal)) return alert("Revisa los datos.");
+            if(id) { await db.collection("pagos").doc(id).update(p); cancelarEdicion(); }
+            else { await db.collection("pagos").add(p); }
+            limpiarForm();
+        }
+
+        db.collection("pagos").orderBy("fecha", "desc").onSnapshot(snap => {
+            const tabla = document.getElementById("cuerpo_tabla"); tabla.innerHTML = "";
+            gtDir=0; gtRad=0; gtInt=0; logsDir=[]; logsRad=[];
+            snap.forEach(doc => {
+                const p = doc.data();
+                const neto = p.montoTotal - (p.tipo === 'publicidad' ? 0 : p.montoInternet);
+                let r=0, d=0;
+                if(p.tipo === "publicidad") { r = neto; } 
+                else {
+                    if(p.locutor.toLowerCase().includes("giovanny escalante")) d = neto;
+                    else if(!p.locutor.toLowerCase().includes("palabras de vida eterna")) { r = neto/2; d = neto/2; }
+                }
+                gtDir+=d; gtRad+=r; gtInt+=p.montoInternet;
+                const conc = p.tipo==='publicidad' ? p.empresa : p.locutor;
+                if(d>0) logsDir.push(`- ${conc}: $${d.toFixed(2)}`);
+                if(r>0) logsRad.push(`- ${conc}: $${r.toFixed(2)}`);
+
+                tabla.innerHTML += `<tr>
+                    <td>${p.tipo==='publicidad'?'P':'R'}</td><td style="text-align:left">${conc}</td>
+                    <td>$${p.montoTotal}</td><td>$${neto.toFixed(2)}</td>
+                    <td style="color:green">$${p.montoInternet}</td><td style="color:orange">$${r.toFixed(2)}</td><td style="color:blue">$${d.toFixed(2)}</td>
+                    <td>
+                        <button class="btn-edit" onclick="prepararEdicion('${doc.id}', ${JSON.stringify(p).replace(/"/g, '&quot;')})">✏️</button>
+                        <button class="btn-del" onclick="eliminarRegistro('${doc.id}')">🗑️</button>
+                    </td>
+                </tr>`;
+            });
+            document.getElementById("tot_direccion").innerText = "$"+gtDir.toFixed(2);
+            document.getElementById("tot_radio").innerText = "$"+gtRad.toFixed(2);
+            document.getElementById("tot_internet").innerText = "$"+gtInt.toFixed(2);
+        });
+
+        function enviarReporte(tipo, destino) {
+            let tel = (tipo === 'direccion') ? tLeo : tRad;
+            if(destino === 'admin') tel = tAdmin;
+            if(!tel) return alert("Número no configurado.");
+            const total = (tipo === 'direccion') ? gtDir : gtRad;
+            const logs = (tipo === 'direccion') ? logsDir : logsRad;
+            const prefijo = (destino === 'admin') ? "*[REVISIÓN ADMIN]*%0A" : "";
+            const msg = `${prefijo}*INFORME ${tipo.toUpperCase()}*%0A*Fecha:* ${new Date().toLocaleDateString()}%0A------------------------------%0A${logs.join("%0A")}%0A------------------------------%0A*TOTAL:* $${total.toFixed(2)}`;
+            window.open(`https://wa.me/${tel.replace(/\D/g,'')}?text=${msg}`, '_blank');
+        }
+
+        function prepararEdicion(id, p) {
+            document.getElementById("edit_id").value = id;
+            document.getElementById("tipo_pago").value = p.tipo;
+            document.getElementById("select_prog").value = p.locutor;
+            document.getElementById("nombre_empresa").value = p.empresa;
+            document.getElementById("monto_recibido").value = p.montoTotal;
+            document.getElementById("monto_internet").value = p.montoInternet;
+            document.getElementById("fecha_pago").value = p.fecha;
+            document.getElementById("periodo_pago").value = p.periodo;
+            document.getElementById("notas_pago").value = p.notas;
+            document.getElementById("btn_guardar").innerText = "GUARDAR CAMBIOS";
+            document.getElementById("btn_cancelar").classList.remove("hidden");
+            togglePublicidadFields(); window.scrollTo(0,0);
+        }
+
+        function cancelarEdicion() { document.getElementById("edit_id").value = ""; document.getElementById("btn_guardar").innerText = "EFECTUAR REGISTRO"; document.getElementById("btn_cancelar").classList.add("hidden"); limpiarForm(); }
+        async function eliminarRegistro(id) { if(confirm("¿Borrar pago?")) await db.collection("pagos").doc(id).delete(); }
+        async function borrarTodoElHistorial() { if(confirm("¿Borrar TODO?")) { const snap = await db.collection("pagos").get(); const batch = db.batch(); snap.forEach(doc => batch.delete(doc.ref)); await batch.commit(); } }
+        function limpiarForm() { document.getElementById("monto_recibido").value = ""; document.getElementById("monto_internet").value = "0"; document.getElementById("nombre_empresa").value = ""; document.getElementById("notas_pago").value = ""; }
+    </script>
+</body>
+</html>
