@@ -1,13 +1,13 @@
 {
-  "name": "CONTROL RADIO",
-  "short_name": "CONTROL RADIO",
+  "name": "Control Radio Manaure",
+  "short_name": "Control Radio",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#f0f2f5",
+  "background_color": "#ffffff",
   "theme_color": "#d32f2f",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/2301/2301145.png",
+      "src": "logo.png",
       "sizes": "512x512",
       "type": "image/png"
     }
