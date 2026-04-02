@@ -142,7 +142,6 @@
         let logsDir = [], logsRad = [];
         let gtDir=0, gtRad=0, gtInt=0;
 
-        // Cargar Configuración de Teléfonos
         db.collection("config").doc("contactos").onSnapshot(doc => { 
             if(doc.exists){ 
                 const d = doc.data(); tAdmin = d.admin; tLeo = d.leo; tRad = d.radio;
@@ -161,7 +160,6 @@
             alert("Números guardados.");
         }
 
-        // Directorio
         db.collection("programas").orderBy("nombre").onSnapshot(snap => {
             const select = document.getElementById("select_prog");
             const lista = document.getElementById("lista_directorio");
@@ -182,7 +180,6 @@
 
         async function borrarPersona(id) { if(confirm("¿Eliminar del directorio?")) await db.collection("programas").doc(id).delete(); }
 
-        // Pagos
         function togglePublicidadFields() {
             const tipo = document.getElementById("tipo_pago").value;
             document.getElementById("campos_publicidad").classList.toggle("hidden", tipo !== "publicidad");
@@ -266,6 +263,15 @@
         async function eliminarRegistro(id) { if(confirm("¿Borrar pago?")) await db.collection("pagos").doc(id).delete(); }
         async function borrarTodoElHistorial() { if(confirm("¿Borrar TODO?")) { const snap = await db.collection("pagos").get(); const batch = db.batch(); snap.forEach(doc => batch.delete(doc.ref)); await batch.commit(); } }
         function limpiarForm() { document.getElementById("monto_recibido").value = ""; document.getElementById("monto_internet").value = "0"; document.getElementById("nombre_empresa").value = ""; document.getElementById("notas_pago").value = ""; }
+
+        // Registro del Service Worker para permitir la instalación
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registrado'))
+                    .catch(err => console.log('Error al registrar SW', err));
+            });
+        }
     </script>
 </body>
 </html>
