@@ -204,30 +204,52 @@
         db.collection("pagos").orderBy("fecha", "desc").onSnapshot(snap => {
             const tabla = document.getElementById("cuerpo_tabla"); tabla.innerHTML = "";
             gtDir=0; gtRad=0; gtInt=0; logsDir=[]; logsRad=[];
+            
             snap.forEach(doc => {
                 const p = doc.data();
-                const neto = p.montoTotal - (p.tipo === 'publicidad' ? 0 : p.montoInternet);
+                
+                // LOGICA DE CALCULO CORREGIDA
+                const bruto = parseFloat(p.montoTotal) || 0;
+                const internet = parseFloat(p.montoInternet) || 0;
+                
+                // El neto es lo que queda para repartir entre Radio y Dirección
+                const neto = (p.tipo === 'publicidad') ? bruto : (bruto - internet);
+                
                 let r=0, d=0;
-                if(p.tipo === "publicidad") { r = neto; } 
+                const locutorStr = (p.locutor || "").toLowerCase();
+
+                if(p.tipo === "publicidad") { 
+                    r = neto; // Publicidad va 100% a la radio
+                } 
                 else {
-                    if(p.locutor.toLowerCase().includes("giovanny escalante")) d = neto;
-                    else if(!p.locutor.toLowerCase().includes("palabras de vida eterna")) { r = neto/2; d = neto/2; }
+                    // Si el locutor es Giovanny Escalante, va todo a Dirección
+                    if(locutorStr.includes("giovanny escalante")) {
+                        d = neto;
+                    } 
+                    // Para todos los demás (incluye Palabras de Vida y otros), 50/50
+                    else {
+                        r = neto / 2; 
+                        d = neto / 2;
+                    }
                 }
-                gtDir+=d; gtRad+=r; gtInt+=p.montoInternet;
+
+                gtDir += d; gtRad += r; gtInt += internet;
+                
                 const conc = p.tipo==='publicidad' ? p.empresa : p.locutor;
                 if(d>0) logsDir.push(`- ${conc}: $${d.toFixed(2)}`);
                 if(r>0) logsRad.push(`- ${conc}: $${r.toFixed(2)}`);
 
                 tabla.innerHTML += `<tr>
                     <td>${p.tipo==='publicidad'?'P':'R'}</td><td style="text-align:left">${conc}</td>
-                    <td>$${p.montoTotal}</td><td>$${neto.toFixed(2)}</td>
-                    <td style="color:green">$${p.montoInternet}</td><td style="color:orange">$${r.toFixed(2)}</td><td style="color:blue">$${d.toFixed(2)}</td>
+                    <td>$${bruto.toFixed(2)}</td><td>$${neto.toFixed(2)}</td>
+                    <td style="color:green">$${internet.toFixed(2)}</td><td style="color:orange">$${r.toFixed(2)}</td><td style="color:blue">$${d.toFixed(2)}</td>
                     <td>
                         <button class="btn-edit" onclick="prepararEdicion('${doc.id}', ${JSON.stringify(p).replace(/"/g, '&quot;')})">✏️</button>
                         <button class="btn-del" onclick="eliminarRegistro('${doc.id}')">🗑️</button>
                     </td>
                 </tr>`;
             });
+            
             document.getElementById("tot_direccion").innerText = "$"+gtDir.toFixed(2);
             document.getElementById("tot_radio").innerText = "$"+gtRad.toFixed(2);
             document.getElementById("tot_internet").innerText = "$"+gtInt.toFixed(2);
@@ -249,6 +271,7 @@
             document.getElementById("tipo_pago").value = p.tipo;
             document.getElementById("select_prog").value = p.locutor;
             document.getElementById("nombre_empresa").value = p.empresa;
+            document.getElementById("monto_received").value = p.montoTotal; // Fix: use ID in your HTML
             document.getElementById("monto_recibido").value = p.montoTotal;
             document.getElementById("monto_internet").value = p.montoInternet;
             document.getElementById("fecha_pago").value = p.fecha;
@@ -264,7 +287,6 @@
         async function borrarTodoElHistorial() { if(confirm("¿Borrar TODO?")) { const snap = await db.collection("pagos").get(); const batch = db.batch(); snap.forEach(doc => batch.delete(doc.ref)); await batch.commit(); } }
         function limpiarForm() { document.getElementById("monto_recibido").value = ""; document.getElementById("monto_internet").value = "0"; document.getElementById("nombre_empresa").value = ""; document.getElementById("notas_pago").value = ""; }
 
-        // Registro del Service Worker para permitir la instalación
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
